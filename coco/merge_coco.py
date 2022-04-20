@@ -1,4 +1,4 @@
-import sys, getopt, json, logging
+import sys, json, logging
 
 logger = logging.getLogger(__name__)
 
@@ -10,7 +10,6 @@ def coco_merge(input_extend: str, input_add: str, output_file: str) -> str:
         input_extend: Path to input file to be extended.
         input_add: Path to input file to be added.
         output_file : Path to output file with merged annotations.
-        indent: Argument passed to `json.dump`. See https://docs.python.org/3/library/json.html#json.dump.
     """
     indent = 4
     with open(input_extend, "r") as f:
