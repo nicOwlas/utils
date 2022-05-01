@@ -51,9 +51,11 @@ if __name__ == "__main__":
 
     seen = set()
     duplicates = []
+    checked = []
 
     for file_name in file_name_list:
         file_hash = hexhash(file_name)
+        checked.append([file_name, file_hash])
         if file_hash in seen:
             duplicates.append((file_name, file_hash))
         else:
@@ -63,6 +65,6 @@ if __name__ == "__main__":
     # print("Number of analyzed files:", len(file_name_list))
     with open(output_path, "w") as outfile:
         outfile.write(
-            json.dumps({"duplicates": duplicates, "seen": list(seen)}, indent=4)
+            json.dumps({"duplicates": duplicates, "checked": checked}, indent=4)
         )
     print("Number of duplicates:", len(duplicates))
