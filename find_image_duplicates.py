@@ -48,7 +48,6 @@ if __name__ == "__main__":
     # input_path = "/Volumes/GoogleDrive-112639467614389739071/My Drive/Pictures/2022/05"
 
     file_name_list = file_list(input_path)
-
     seen = set()
     duplicates = []
     checked = []
