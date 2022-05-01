@@ -30,7 +30,11 @@ def hexhash(file_name):
 
 def file_list(input_path):
     file_name_list = []
-    for input_path, currentDirectory, files in os.walk(input_path):
+    exclude_directories = set(["@eaDir"])  # Do not explore Synology hidden directory
+    for input_path, dirs, files in os.walk(input_path):
+        dirs[:] = [
+            d for d in dirs if d not in exclude_directories
+        ]  # exclude directory if in exclude list
         files = [file for file in files if not file[0] == "."]
         for file in files:
             file_name_list.append(os.path.join(input_path, file))
