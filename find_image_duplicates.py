@@ -57,7 +57,7 @@ if __name__ == "__main__":
         if file_hash in seen:
             duplicates.append((file_name, file_hash))
         else:
-            seen.add((file_name, file_hash))
+            seen.add(file_hash)
 
     # print("Duplicates:", duplicates)
     # print("Number of analyzed files:", len(file_name_list))
@@ -65,3 +65,4 @@ if __name__ == "__main__":
         outfile.write(
             json.dumps({"duplicates": duplicates, "seen": list(seen)}, indent=4)
         )
+    print("Number of duplicates:", len(duplicates))
