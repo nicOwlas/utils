@@ -45,25 +45,24 @@ def file_list(input_path):
 if __name__ == "__main__":
     input_path = sys.argv[1]
     output_path = sys.argv[2]
-    # input_path = "/Volumes/GoogleDrive-112639467614389739071/My Drive/Pictures/2022/05"
 
     file_name_list = file_list(input_path)
     seen = set()
-    duplicates = []
-    checked = []
 
+    duplicated_files = {}
+    checked_files = {}
     for file_name in file_name_list:
         file_hash = hexhash(file_name)
-        checked.append([file_name, file_hash])
-        if file_hash in seen:
-            duplicates.append((file_name, file_hash))
+        if file_hash in checked_files:
+            checked_files[file_hash].append(file_name)
+            duplicated_files[file_hash] = checked_files[file_hash]
         else:
-            seen.add(file_hash)
+            checked_files[file_hash] = [file_name]
 
-    # print("Duplicates:", duplicates)
-    # print("Number of analyzed files:", len(file_name_list))
     with open(output_path, "w") as outfile:
         outfile.write(
-            json.dumps({"duplicates": duplicates, "checked": checked}, indent=4)
+            json.dumps(
+                {"duplicates": duplicated_files, "checked": checked_files}, indent=4
+            )
         )
-    print("Number of duplicates:", len(duplicates))
+    print("Number of duplicates:", len(duplicated_files))
