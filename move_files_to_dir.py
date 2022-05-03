@@ -1,4 +1,5 @@
 import json, os, sys, shutil
+import pathlib
 
 # Move duplicated files
 # Priority 1: extension is in list of valid extensions (do not move .lua, .lrdata)
@@ -25,8 +26,12 @@ def filter_files(duplicated_files, extensions_watched):
 
 def move_files(files_to_move, destination):
     for count, file in enumerate(files_to_move):
-        destination_path = os.path.join(destination, file[1:]) 
-        print("Moving file #{}: {}".format(count,destination_path))
+        destination_path = os.path.join(destination, file[1:])
+        # Create directory if it does not exist
+        pathlib.Path(os.path.dirname(destination_path)).mkdir(
+            parents=True, exist_ok=True
+        )
+        print("Moving file #{}: {}".format(count, destination_path))
         shutil.move(file, destination_path)
 
 
