@@ -16,19 +16,18 @@ def filter_files(duplicated_files, extensions_watched):
 
         # Consider moving files if at least one element is in the list
         if len(duplicated_sorted_files) > 1:
-            print("\nKeep ", duplicated_sorted_files[0])
             for file in duplicated_sorted_files[1:]:
                 filename, file_extension = os.path.splitext(file)
                 if file_extension in extensions_watched:
                     files_to_move.append(file)
-                    print("Move ", file)
     return files_to_move
 
 
 def move_files(files_to_move, destination):
-    for file in files_to_move:
-        print("Moving file {} to {}".format(file, os.path.join(destination, file[1:])))
-        # shutil.move(file, os.join(destination, file))
+    for count, file in enumerate(files_to_move):
+        destination_path = os.path.join(destination, file[1:]) 
+        print("Moving file #{}: {}".format(count,destination_path))
+        shutil.move(file, destination_path)
 
 
 if __name__ == "__main__":
@@ -62,4 +61,3 @@ if __name__ == "__main__":
 
     files_to_move = filter_files(duplicated_files, extensions_watched)
     move_files(files_to_move, destination)
-    print(destination)
