@@ -32,7 +32,10 @@ def move_files(files_to_move, destination):
             parents=True, exist_ok=True
         )
         print("Moving file #{}: {}".format(count, destination_path))
-        shutil.move(file, destination_path)
+        try:
+            shutil.move(file, destination_path)
+        except:
+            print("File not found")
 
 
 if __name__ == "__main__":
