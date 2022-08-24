@@ -4,6 +4,7 @@ from os.path import isfile, join
 from os import listdir
 import os, sys
 import json
+from time import sleep
 
 
 def hash_bytestr_iter(bytesiter, hasher, ashexstr=False):
@@ -49,9 +50,17 @@ if __name__ == "__main__":
     file_name_list = file_list(input_path)
     seen = set()
 
+    number_of_files = len(file_name_list)
+    print("Number of files to check:", number_of_files)
     duplicated_files = {}
     checked_files = {}
-    for file_name in file_name_list:
+    for file_index, file_name in enumerate(file_name_list):
+        progress = (file_index + 1) / number_of_files
+        print(
+            "[%-100s] %d%%" % ("=" * int(100 * progress), 100 * progress),
+            end="\r",
+        )
+        sleep(0.001)
         file_hash = hexhash(file_name)
         if file_hash in checked_files:
             checked_files[file_hash].append(file_name)
@@ -65,4 +74,4 @@ if __name__ == "__main__":
                 {"duplicates": duplicated_files, "checked": checked_files}, indent=4
             )
         )
-    print("Number of duplicates:", len(duplicated_files))
+    print("\nNumber of duplicates:", len(duplicated_files))
