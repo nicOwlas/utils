@@ -1,5 +1,9 @@
-import json, os, sys, shutil
+import json
+import os
 import pathlib
+import shutil
+import sys
+
 
 # Move duplicated files
 # Priority 1: extension is in list of valid extensions (do not move .lua, .lrdata)
