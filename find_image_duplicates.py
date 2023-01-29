@@ -1,9 +1,9 @@
-import glob
+"""Find file duplicates in a given directory"""
 import hashlib
-from os.path import isfile, join
-from os import listdir
-import os, sys
 import json
+import os
+import sys
+from datetime import datetime, timezone
 from time import sleep
 
 
@@ -21,54 +21,57 @@ def file_as_blockiter(afile, blocksize=65536):
             block = afile.read(blocksize)
 
 
-def hexhash(file_name):
+def hexhash(file: str):
+    """Return file hash"""
     return hash_bytestr_iter(
-        file_as_blockiter(open(file_name, "rb")),
+        file_as_blockiter(open(file, "rb")),
         hashlib.sha256(),
         ashexstr=True,
     )
 
 
-def file_list(input_path):
-    file_name_list = []
+def file_list(input_dir: str):
+    """List files in input_dir"""
+    file_names = []
     exclude_directories = set(["@eaDir"])  # Do not explore Synology hidden directory
-    for input_path, dirs, files in os.walk(input_path):
+    for input_dir, dirs, files in os.walk(input_dir):
         dirs[:] = [
             d for d in dirs if d not in exclude_directories
         ]  # exclude directory if in exclude list
         files = [file for file in files if not file[0] == "."]
         for file in files:
-            file_name_list.append(os.path.join(input_path, file))
-    print(json.dumps(file_name_list, indent=4, sort_keys=True))
-    return file_name_list
+            file_names.append(os.path.join(input_dir, file))
+    print(json.dumps(file_names, indent=4, sort_keys=True))
+    return file_names
 
 
 if __name__ == "__main__":
-    input_path = sys.argv[1]
-    output_path = sys.argv[2]
+    INPUT_PATH = sys.argv[1]
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%M%S")
+    OUTPUT_FILE = f"{INPUT_PATH}{os.path.sep}{now}-duplicatedFiles.json"
 
-    file_name_list = file_list(input_path)
+    file_name_list = file_list(INPUT_PATH)
     seen = set()
 
-    number_of_files = len(file_name_list)
-    print("Number of files to check:", number_of_files)
+    NUMBER_OF_FILES = len(file_name_list)
+    print("Number of files to check:", NUMBER_OF_FILES)
     duplicated_files = {}
     checked_files = {}
     for file_index, file_name in enumerate(file_name_list):
-        progress = (file_index + 1) / number_of_files
+        progress = (file_index + 1) / NUMBER_OF_FILES
         print(
             "[%-100s] %d%%" % ("=" * int(100 * progress), 100 * progress),
             end="\r",
         )
         sleep(0.001)
-        file_hash = hexhash(file_name)
-        if file_hash in checked_files:
-            checked_files[file_hash].append(file_name)
-            duplicated_files[file_hash] = checked_files[file_hash]
+        FILE_HASH = hexhash(file_name)
+        if FILE_HASH in checked_files:
+            checked_files[FILE_HASH].append(file_name)
+            duplicated_files[FILE_HASH] = checked_files[FILE_HASH]
         else:
-            checked_files[file_hash] = [file_name]
+            checked_files[FILE_HASH] = [file_name]
 
-    with open(output_path, "w") as outfile:
+    with open(OUTPUT_FILE, "w", encoding="utf-8") as outfile:
         outfile.write(
             json.dumps(
                 {"duplicates": duplicated_files, "checked": checked_files}, indent=4
