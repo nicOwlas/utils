@@ -30,7 +30,7 @@ def hexhash(file: str):
     )
 
 
-def file_list(input_dir: str):
+def file_list(input_dir: str, extensions_to_skip: list):
     """List files in input_dir"""
     file_names = []
     exclude_directories = set(["@eaDir"])  # Do not explore Synology hidden directory
@@ -40,7 +40,9 @@ def file_list(input_dir: str):
         ]  # exclude directory if in exclude list
         files = [file for file in files if not file[0] == "."]
         for file in files:
-            file_names.append(os.path.join(input_dir, file))
+            _, file_extension = os.path.splitext(file)
+            if file_extension.lower() not in extensions_to_skip:
+                file_names.append(os.path.join(input_dir, file))
     print(json.dumps(file_names, indent=4, sort_keys=True))
     return file_names
 
@@ -49,9 +51,20 @@ if __name__ == "__main__":
     INPUT_PATH = sys.argv[1]
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H%M%S")
     OUTPUT_FILE = f"{INPUT_PATH}{os.path.sep}{now}-duplicatedFiles.json"
+    EXTENSIONS_TO_IGNORE = [
+        ".zip",
+        ".db",
+        ".db-wal",
+        ".db-shm",
+        ".lrcat",
+        ".lrcat-wal",
+        ".lrcat-shm",
+        ".lock",
+        ".docstore-wal",
+        ".wfindex-wal",
+    ]
 
-    file_name_list = file_list(INPUT_PATH)
-    seen = set()
+    file_name_list = file_list(INPUT_PATH, EXTENSIONS_TO_IGNORE)
 
     NUMBER_OF_FILES = len(file_name_list)
     print("Number of files to check:", NUMBER_OF_FILES)
@@ -77,4 +90,4 @@ if __name__ == "__main__":
                 {"duplicates": duplicated_files, "checked": checked_files}, indent=4
             )
         )
-    print("\nNumber of duplicates:", len(duplicated_files))
+    print(f"\nNumber of duplicates: {len(duplicated_files)}")
