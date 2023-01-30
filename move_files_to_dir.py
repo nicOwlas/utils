@@ -29,7 +29,7 @@ def filter_files(duplicated_files, extensions_watched, keep_file_with_longest_pa
         if len(duplicated_sorted_files) > 1:
             for file in duplicated_sorted_files[1:]:
                 _, file_extension = os.path.splitext(file)
-                if file_extension in extensions_watched:
+                if file_extension.lower() in extensions_watched:
                     files_to_move.append(file)
     print("Files to move: \n", json.dumps(files_to_move, indent=4, sort_keys=True))
     return files_to_move
@@ -64,23 +64,17 @@ if __name__ == "__main__":
     destination = sys.argv[2]
     keep_file_with_longest_path = sys.argv[3]
     extensions_watched = {
-        ".WAV",
-        ".JPEG",
-        ".MP4",
-        ".HEIC",
-        ".JPG",
-        ".CR2",
-        ".dng",
+        ".wav",
         ".jpeg",
         ".mp4",
+        ".heic",
         ".jpg",
+        ".cr2",
+        ".dng",
         ".avi",
-        ".MOV",
-        ".PNG",
         ".mov",
         ".png",
-        ".heic",
-        ".THM",
+        ".thm",
     }
     with open(input_file, "r", encoding="utf-8") as f:
         duplicated_files = json.load(f)
