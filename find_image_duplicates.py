@@ -33,7 +33,16 @@ def hexhash(file: str):
 def file_list(input_dir: str, extensions_to_skip: list):
     """List files in input_dir"""
     file_names = []
-    exclude_directories = set(["@eaDir"])  # Do not explore Synology hidden directory
+    exclude_directories = set(
+        [
+            "@eaDir",
+            "Lightroom",
+            "Lightroom (1)",
+            "Lightroom_1",
+            "Lightroom_2",
+            "Lightroom-old",
+        ]
+    )  # Do not explore Synology hidden directory
     for input_dir, dirs, files in os.walk(input_dir):
         dirs[:] = [
             d for d in dirs if d not in exclude_directories
