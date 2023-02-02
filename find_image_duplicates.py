@@ -1,4 +1,18 @@
-"""Find file duplicates in a given directory"""
+"""
+Find file duplicates in a given directory
+Be able to resume
+    - Store the checked images : hash : [path]
+    - Store the duplicated images = hash : [path]
+    - Store the files = [paths]
+    - store the paths [path]
+0. Open an existing json
+    - add an option to scan for new files
+1. For every image:
+    if image was checked:
+        continue
+    else:
+        check image
+"""
 import hashlib
 import json
 import os
