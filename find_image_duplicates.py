@@ -1,10 +1,13 @@
 """
 Find file duplicates in a given directory
 Be able to resume
+    - Create a DB (path, secret)
+    - 
     - Store the checked images : hash : [path]
     - Store the duplicated images = hash : [path]
     - Store the files = [paths]
     - store the paths [path]
+    - create a json for every file with its hash
 0. Open an existing json
     - add an option to scan for new files
 1. For every image:
