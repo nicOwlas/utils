@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 import sqlite3
+from typing import Generator
 
 
 def create_db(db_name: str):
@@ -37,12 +38,14 @@ def hexhash(file_path: str):
     )
 
 
-def create_db_entry(file_path: str, cursor, connection) -> None:
+def create_db_entry(file_path: str, cursor) -> None:
     """Add an entry to the DB"""
-    cursor.execute(
-        "INSERT INTO pictures VALUES (?, ?)", (file_path, hexhash(file_path))
-    )
-    connection.commit()
+    try:
+        cursor.execute(
+            "INSERT INTO pictures VALUES (?, ?)", (file_path, hexhash(file_path))
+        )
+    except sqlite3.IntegrityError:
+        print(f"UNIQUE constraint failed: {file_path}")
 
 
 def read_db_entry(cursor):
@@ -52,7 +55,7 @@ def read_db_entry(cursor):
 
 
 def list_of_files(input_path: str) -> list:
-    """test os.walk"""
+    """test os.scan"""
     for directory_path, _, files in os.walk(input_path):
         for file in files:
             yield os.path.join(directory_path, file)
@@ -75,12 +78,22 @@ def export_file_names(file_name: str, output_file: str):
 
 
 if __name__ == "__main__":
-    sample_file_path = "/Users/nicolas/Downloads/image.jpeg"
+    SAMPLE_FILE_PATH = "/Users/nicolas/Downloads/image.jpeg"
     connection, cursor = create_db("pictures.db")
-    create_db_entry(sample_file_path, cursor, connection)
-    read_db_entry(cursor)
-    cursor.close()
-    connection.close()
+    with connection:
+        create_db_entry(SAMPLE_FILE_PATH, cursor)
+        connection.commit()
+        read_db_entry(cursor)
+        #     cursor.close()
+        # connection.close()
+
+    file_generator = os.scandir("/Users/nicolas/Downloads/test_duplicates")
+
+    for file in file_generator:
+        if file.is_file():
+            # print(file.path)
+            extension = os.path.splitext(file.name)[-1].lower()
+            print(extension)
 
     # output_file = "/Users/nicolas/Downloads/filenames.json"
     # file_generator = list_of_files(path)
