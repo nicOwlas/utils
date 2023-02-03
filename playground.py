@@ -37,11 +37,12 @@ def hexhash(file_path: str):
     )
 
 
-def create_db_entry(file_path: str, cursor) -> None:
+def create_db_entry(file_path: str, cursor, connection) -> None:
     """Add an entry to the DB"""
     cursor.execute(
         "INSERT INTO pictures VALUES (?, ?)", (file_path, hexhash(file_path))
     )
+    connection.commit()
 
 
 def read_db_entry(cursor):
@@ -76,8 +77,10 @@ def export_file_names(file_name: str, output_file: str):
 if __name__ == "__main__":
     sample_file_path = "/Users/nicolas/Downloads/image.jpeg"
     connection, cursor = create_db("pictures.db")
-    create_db_entry(sample_file_path, cursor)
+    create_db_entry(sample_file_path, cursor, connection)
     read_db_entry(cursor)
+    cursor.close()
+    connection.close()
 
     # output_file = "/Users/nicolas/Downloads/filenames.json"
     # file_generator = list_of_files(path)
