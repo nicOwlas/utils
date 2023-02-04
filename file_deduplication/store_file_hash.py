@@ -29,6 +29,7 @@ def main(root_path, db_path, relevant_extensions):
             if file.is_file():
                 count_files += 1
                 insert_db_entry(file.path, cursor)
+                print(f"File analyzed: {count_files}")
             if count_files % 100 == 0:
                 connection.commit()
                 print(
