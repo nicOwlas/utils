@@ -1,5 +1,5 @@
 """
-Store files hash in a DB
+Store files' hash in a DB
 """
 import os
 import sys
@@ -12,16 +12,10 @@ def scantree(path, relevant_extensions: list = []):
     """Recursively yield DirEntry objects for given directory."""
     for entry in os.scandir(path):
         if entry.is_dir(follow_symlinks=False):
-            print(f"Is dir: {entry.path}")
-            yield from scantree(entry.path)
+            yield from scantree(entry.path, relevant_extensions)
         else:
             entry_extension = os.path.splitext(entry.name)[-1].lower()
-            print(
-                f"Extensions: {os.path.splitext(entry.name)}, extension: {entry_extension}"
-            )
-            print(entry.path)
             if entry_extension in set(relevant_extensions):
-                print(f"I'm in {entry.path}")
                 yield entry
 
 
@@ -47,6 +41,7 @@ def main(root_path, db_path, relevant_extensions):
 
 if __name__ == "__main__":
     INPUT_PATH = sys.argv[1]
+    DB_PATH = sys.argv[2]
     media_extensions = [
         ".jpeg",
         ".jpg",
@@ -61,6 +56,6 @@ if __name__ == "__main__":
 
     main(
         root_path=INPUT_PATH,
-        db_path="/Users/nicolas/Downloads/test_duplicates/Pictures.db",
+        db_path=DB_PATH,
         relevant_extensions=media_extensions,
     )
