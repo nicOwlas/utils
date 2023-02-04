@@ -13,6 +13,18 @@ def create_db(db_name: str):
     return connection, cursor
 
 
+def path_in_db(connection, file_path: str):
+    cursor = connection.cursor()
+    cursor.execute(
+        """
+        SELECT 1 FROM pictures
+        WHERE path = ?
+    """,
+        (file_path,),
+    )
+    return cursor.fetchone() is not None
+
+
 def insert_db_entry(file_path: str, cursor) -> None:
     """Add an entry to the DB"""
     try:
