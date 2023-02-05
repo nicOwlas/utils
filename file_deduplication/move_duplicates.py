@@ -1,3 +1,4 @@
+import json
 import os
 import pathlib
 import shutil
@@ -21,6 +22,7 @@ def main(db_name: str, duplicates_folder: str) -> None:
     )
 
     # Delete duplicates keeping the shortest path
+    duplicates_info = {}
     for row in cursor.fetchall():
         hash, count = row
 
@@ -35,30 +37,34 @@ def main(db_name: str, duplicates_folder: str) -> None:
         )
 
         paths = [path for path, in cursor.fetchall()]
-        for path in paths[1:]:
-            try:
-                destination = os.path.join(duplicates_folder, path[1:])
+        duplicates_info[hash] = paths
+        # for path in paths[1:]:
+        #     try:
+        #         destination = os.path.join(duplicates_folder, path[1:])
 
-                # pathlib.Path(os.path.dirname(destination)).mkdir(
-                #     parents=True, exist_ok=True
-                # )
-                print(f"Moving file from: {path} to: {destination}")
-                # shutil.move(path, destination)
-                # os.remove(path)
-            except FileNotFoundError:
-                print(f"File not found: {path}")
-                continue
-            else:
-                pass
-                # print(path)
-                # cursor.execute(
-                #     """
-                #     DELETE FROM pictures
-                #     WHERE secret = ? AND path = ?
-                # """,
-                #     (hash, path),
-                # )
-        conn.commit()
+        #         # pathlib.Path(os.path.dirname(destination)).mkdir(
+        #         #     parents=True, exist_ok=True
+        #         # )
+        #         # print(f"Moving file from: {path} to: {destination}")
+        #         # shutil.move(path, destination)
+        #         # os.remove(path)
+        #     except FileNotFoundError:
+        #         print(f"File not found: {path}")
+        #         continue
+        #     else:
+        #         pass
+        #         # print(path)
+        #         # cursor.execute(
+        #         #     """
+        #         #     DELETE FROM pictures
+        #         #     WHERE secret = ? AND path = ?
+        #         # """,
+        #         #     (hash, path),
+        #         # )
+        # conn.commit()
+        # Write duplicates information to a JSON file
+    with open("duplicates_info.json", "w", encoding="utf-8") as file:
+        json.dump(duplicates_info, file, indent=4)
 
     conn.close()
 
