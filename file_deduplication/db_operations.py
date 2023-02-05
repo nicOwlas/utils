@@ -31,8 +31,8 @@ def insert_db_entry(file_path: str, cursor) -> None:
         cursor.execute(
             "INSERT INTO pictures VALUES (?, ?)", (file_path, hexhash(file_path))
         )
-    except sqlite3.IntegrityError:
-        print(f"UNIQUE constraint failed: {file_path}")
+    except PermissionError:
+        pass
 
 
 def read_db_entry(cursor):
