@@ -79,7 +79,7 @@ if __name__ == "__main__":
         ".mp4",
         ".dng",
     ]
-    directories_to_ignore = ["@eaDir"]
+    directories_to_ignore = ["@eaDir", "Lightroom"]
     main(
         root_path=INPUT_PATH,
         db_path=DB_PATH,
