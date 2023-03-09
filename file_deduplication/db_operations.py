@@ -29,7 +29,8 @@ def insert_db_entry(file_path: str, cursor) -> None:
     """Add an entry to the DB"""
     try:
         cursor.execute(
-            "INSERT INTO pictures VALUES (?, ?)", (file_path, hexhash(file_path))
+            "INSERT INTO pictures VALUES (?, ?, ?)",
+            (file_path, hexhash(file_path), dhash(file_path)),
         )
     except PermissionError:
         pass
