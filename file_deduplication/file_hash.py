@@ -34,9 +34,21 @@ def hexhash(file: str):
 def dhash(file: str):
     """Return 16 bit perceptual hash of an image file (JPG, TIFF, HEIC, PNG)"""
     ext = pathlib.Path(file).suffix.lower()
-    if ext not in [".jpg", ".jpeg", ".png", ".heic"]:
-        raise ValueError(f"{ext} file type is not supported")
-    return imagehash.dhash(
-        Image.open(file),
-        hash_size=16,
-    )
+    if ext in [".jpg", ".jpeg", ".png", ".heic"]:
+        return str(
+            imagehash.dhash(
+                Image.open(file),
+                hash_size=16,
+            )
+        )
+    else:
+        print(f"{ext} file type is not supported")
+        return None
+
+    # if ext not in [".jpg", ".jpeg", ".png", ".heic"]:
+    #     return ""
+    #     raise ValueError(f"{ext} file type is not supported")
+    # return imagehash.dhash(
+    #     Image.open(file),
+    #     hash_size=16,
+    # )
