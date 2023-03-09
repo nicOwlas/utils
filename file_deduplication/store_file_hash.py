@@ -4,7 +4,13 @@ Store files' hash in a DB
 import os
 import sys
 
-from db_operations import create_db, insert_db_entry, path_in_db
+from db_operations import (
+    create_db,
+    insert_db_entry,
+    is_dhash_null,
+    is_path_in_db,
+    update_dhash,
+)
 
 
 def is_path_relevant(path: str, directories_to_ignore: list) -> bool:
@@ -47,11 +53,15 @@ def main(root_path, db_path, directories_to_ignore, relevant_extensions):
         for file in files_generator:
             if file.is_file():
                 count_files += 1
-                print(f"Analyzing file #{count_files}")
-                if not path_in_db(connection, file.path):
+                print(f"Analyzing file #{count_files} - {file.path}")
+
+                if not is_path_in_db(connection, file.path):
                     added_files += 1
                     insert_db_entry(file.path, cursor)
                     print(f"Files added: {added_files}")
+                elif is_dhash_null(connection, file.path):
+                    update_dhash(file.path, cursor)
+
             if added_files > 0 and added_files % 100 == 0:
                 connection.commit()
                 print(
