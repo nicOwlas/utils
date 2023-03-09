@@ -8,7 +8,7 @@ def create_db(db_name: str):
     connection = sqlite3.connect(db_name)
     cursor = connection.cursor()
     cursor.execute(
-        "CREATE TABLE IF NOT EXISTS pictures (path TEXT UNIQUE, secret TEXT)"
+        "CREATE TABLE IF NOT EXISTS pictures (path TEXT UNIQUE, hash TEXT, dhash TEXT)"
     )
     return connection, cursor
 
