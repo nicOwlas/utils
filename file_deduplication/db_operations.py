@@ -13,7 +13,7 @@ def create_db(db_name: str):
     return connection, cursor
 
 
-def path_in_db(connection, file_path: str):
+def is_path_in_db(connection, file_path: str):
     cursor = connection.cursor()
     cursor.execute(
         """
