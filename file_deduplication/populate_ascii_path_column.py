@@ -20,7 +20,7 @@ def ascii_path(root_path: str, db_name: str) -> None:
     updated_path = 0
     for index, row in enumerate(cursor.fetchall()):
         rowid, path, ascii_path = row
-        unidecode_path = unidecode(path)
+        unidecode_path = unidecode(path).lower()
         if ascii_path != unidecode_path:
             updated_path += 1
             print(f"#{index}: {path} -> {unidecode_path}")
