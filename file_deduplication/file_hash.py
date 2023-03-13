@@ -24,25 +24,33 @@ def file_as_blockiter(afile, blocksize=65536):
 
 def hexhash(file: str):
     """Return file sha256 hash"""
-    return hash_bytestr_iter(
-        file_as_blockiter(open(file, "rb")),
-        hashlib.sha256(),
-        ashexstr=True,
-    )
+    try:
+        return hash_bytestr_iter(
+            file_as_blockiter(open(file, "rb")),
+            hashlib.sha256(),
+            ashexstr=True,
+        )
+    except OSError:
+        print(f"OSError on hexhash on {file}")
+        return None
 
 
 def dhash(file: str):
     """Return 16 bit perceptual hash of an image file (JPG, TIFF, HEIC, PNG)"""
-    ext = pathlib.Path(file).suffix.lower()
-    if ext in [".jpg", ".jpeg", ".png", ".heic"]:
-        return str(
-            imagehash.dhash(
-                Image.open(file),
-                hash_size=16,
+    try:
+        ext = pathlib.Path(file).suffix.lower()
+        if ext in [".jpg", ".jpeg", ".png", ".heic"]:
+            return str(
+                imagehash.dhash(
+                    Image.open(file),
+                    hash_size=16,
+                )
             )
-        )
-    else:
-        print(f"{ext} file type is not supported")
+        else:
+            print(f"{ext} file type is not supported")
+            return None
+    except OSError:
+        print(f"OSError on dhash on {file}")
         return None
 
     # if ext not in [".jpg", ".jpeg", ".png", ".heic"]:
