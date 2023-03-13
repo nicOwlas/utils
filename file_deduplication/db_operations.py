@@ -8,7 +8,7 @@ def create_db(db_name: str):
     connection = sqlite3.connect(db_name)
     cursor = connection.cursor()
     cursor.execute(
-        "CREATE TABLE IF NOT EXISTS pictures (path TEXT UNIQUE, hash TEXT, dhash TEXT)"
+        "CREATE TABLE IF NOT EXISTS pictures (path TEXT UNIQUE, hash TEXT, dhash TEXT, ascii_path TEXT UNIQUE)"
     )
     return connection, cursor
 
@@ -25,23 +25,23 @@ def is_path_in_db(connection, file_path: str):
     return cursor.fetchone() is not None
 
 
-def insert_db_entry(file_path: str, cursor) -> None:
+def insert_db_entry(relative_path: str, file_path: str, cursor) -> None:
     """Add an entry to the DB"""
     try:
         cursor.execute(
             "INSERT INTO pictures VALUES (?, ?, ?)",
-            (file_path, hexhash(file_path), dhash(file_path)),
+            (relative_path, hexhash(file_path), dhash(file_path)),
         )
     except PermissionError:
         pass
 
 
-def is_dhash_null(connection, file_path: str):
-    """Returns True if a given row dhash value is NULL """
+def is_dhash_null(connection, relative_path: str):
+    """Returns True if a given row dhash value is NULL"""
     cursor = connection.cursor()
     cursor.execute(
         "SELECT CASE WHEN dhash IS NULL THEN 1 ELSE 0 END FROM pictures WHERE path = ?",
-        (file_path,),
+        (relative_path,),
     )
 
     row = cursor.fetchone()
@@ -53,11 +53,11 @@ def is_dhash_null(connection, file_path: str):
         return False
 
 
-def update_dhash(file_path: str, cursor) -> None:
+def update_dhash(relative_path: str, file_path: str, cursor) -> None:
     """Add an entry to the DB"""
     cursor.execute(
         "UPDATE pictures SET dhash = ? WHERE path = ? AND dhash IS NULL",
-        (dhash(file_path), file_path),
+        (dhash(file_path), relative_path),
     )
 
 
