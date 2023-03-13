@@ -14,55 +14,58 @@ def main(root_path: str, db_name: str) -> None:
     # Find duplicated hashes
     cursor.execute(
         """
-    SELECT hash, COUNT(*)
+    SELECT ascii_path, COUNT(*)
     FROM pictures
-    GROUP BY hash
-    HAVING COUNT(*) > 1 AND hash IS NOT NULL
+    GROUP BY ascii_path
+    HAVING COUNT(*) > 1 AND ascii_path IS NOT NULL
     """
     )
 
     # Delete duplicates keeping the shortest path
-    for row in cursor.fetchall():
-        hash, count = row
+    for index, row in enumerate(cursor.fetchall()):
+        ascii_path, count = row
 
         cursor.execute(
             """
-            SELECT ROWID, path
+            SELECT ROWID, path, ascii_path, dhash
             FROM pictures
-            WHERE hash = ?
-            ORDER BY LENGTH(path)
+            WHERE ascii_path = ?
+            ORDER BY LENGTH(dhash)
         """,
-            (hash,),
+            (ascii_path,),
         )
 
-        items = [{"rowid": rowid, "path": path} for (rowid, path) in cursor.fetchall()]
-        original_item = items[-1]
+        items = [
+            {"rowid": rowid, "path": path, "dhash": dhash}
+            for (rowid, path, ascii_path, dhash) in cursor.fetchall()
+        ]
+        original_item = items[-1]  # Keeping the item with the longest dhash
         full_path_original = os.path.join(root_path, original_item.get("path"))
         for item in items[:-1]:
             try:
                 full_path = os.path.join(root_path, item.get("path"))
                 if os.path.samefile(full_path_original, full_path):
                     print(
-                        f"Keeping {original_item.get('path')} Removing {item.get('path')}"
+                        f"#{index}: Keeping {original_item.get('path')} Removing {item.get('path')}"
                     )
-                #     cursor.execute(
-                #         """
-                #     DELETE FROM pictures
-                #     WHERE path = ? and rowid = ?
-                # """,
-                #         (item.get("path"), item.get("rowid")),
-                #     )
+                    cursor.execute(
+                        """
+                    DELETE FROM pictures
+                    WHERE path = ? and rowid = ?
+                    """,
+                        (item.get("path"), item.get("rowid")),
+                    )
 
             except FileNotFoundError:
                 print(f"File not found: {item.get('path')}")
-                # cursor.execute(
-                #     """
-                #     DELETE FROM pictures
-                #     WHERE path = ? and rowid = ?
-                # """,
-                #     (item.get("path"), item.get("rowid")),
-                # )
-                # continue
+                cursor.execute(
+                    """
+                    DELETE FROM pictures
+                    WHERE path = ? and rowid = ?
+                """,
+                    (item.get("path"), item.get("rowid")),
+                )
+                continue
         conn.commit()
 
     conn.close()
