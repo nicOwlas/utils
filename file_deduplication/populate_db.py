@@ -7,10 +7,11 @@ import sys
 from db_operations import (
     create_db,
     insert_db_entry,
+    is_ascii_path_in_db,
     is_dhash_null,
-    is_path_in_db,
     update_dhash,
 )
+from unidecode import unidecode
 
 
 def is_path_relevant(path: str, directories_to_ignore: list) -> bool:
@@ -43,7 +44,9 @@ def scantree(path, directories_to_ignore: list, relevant_extensions: list):
             continue
 
 
-def main(root_path, db_path, directories_to_ignore, relevant_extensions):
+def populate_db(
+    root_path: str, db_path: str, directories_to_ignore: list, relevant_extensions: list
+):
     """Store in a DB, media files hashes"""
     connection, cursor = create_db(db_path)
     files_generator = scantree(root_path, directories_to_ignore, relevant_extensions)
@@ -54,19 +57,19 @@ def main(root_path, db_path, directories_to_ignore, relevant_extensions):
             if file.is_file():
                 count_files += 1
                 print(f"Analyzing file #{count_files} - {file.path}")
+                relative_path = os.path.relpath(file.path, root_path)
+                ascii_path = unidecode(relative_path).lower()
 
-                if not is_path_in_db(connection, file.path):
+                if not is_ascii_path_in_db(ascii_path, cursor):
+                    insert_db_entry(relative_path, file.path, ascii_path, cursor)
                     added_files += 1
-                    insert_db_entry(file.path, cursor)
-                    print(f"Files added: {added_files}")
-                elif is_dhash_null(connection, file.path):
-                    update_dhash(file.path, cursor)
+                elif is_dhash_null(ascii_path, cursor):
+                    update_dhash(ascii_path, file.path, cursor)
+                    added_files += 1
 
             if added_files > 0 and added_files % 100 == 0:
                 connection.commit()
-                print(
-                    f"Committing to DB - Files analyzed: {count_files} - last commited: {file.path}"
-                )
+                print(f"Committing to DB - Files analyzed: {count_files}")
         connection.commit()
 
     print(f"Task completed: Scanned {count_files} files. Added {added_files} files")
@@ -90,7 +93,7 @@ if __name__ == "__main__":
         ".dng",
     ]
     directories_to_ignore = ["@eaDir", "Lightroom"]
-    main(
+    populate_db(
         root_path=INPUT_PATH,
         db_path=DB_PATH,
         directories_to_ignore=directories_to_ignore,
