@@ -1,4 +1,6 @@
-import sys, json, logging
+import json
+import logging
+import sys
 from itertools import chain
 
 logger = logging.getLogger(__name__)
@@ -118,9 +120,9 @@ def transform_sterblue_to_coco(
                 {
                     "id": index_annotation,
                     "image_id": index_image,
-                    "category_id": mapping_category_name_index[
-                        detection["type"]["name"]
-                    ],
+                    "category_id": mapping_category_name_index.get(
+                        detection["type"]["name"], -1
+                    ),
                     "segmentation": [
                         [
                             abs(coordinate)
