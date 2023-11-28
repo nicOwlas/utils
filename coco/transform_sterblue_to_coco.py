@@ -1,3 +1,4 @@
+import argparse
 import json
 import logging
 import sys
@@ -141,14 +142,39 @@ def transform_sterblue_to_coco(
     with open(output_file, "w") as f:
         json.dump(output, f, indent=indent)
 
-    print("Merge status: Finished")
+    print("Conversion status: Finished")
 
     return output_file
 
 
+def main():
+    parser = argparse.ArgumentParser(
+        description="Convert a Sterblue annotation file to the COCO annotation format."
+    )
+    parser.add_argument(
+        "--sterblue-annotation",
+        dest="input_sterblue",
+        help="path to your sterblue annotation file",
+        required=True,
+    )
+
+    parser.add_argument(
+        "--category-file",
+        dest="input_categories",
+        help="path to the mapping file",
+        required=True,
+    )
+
+    parser.add_argument(
+        "--coco-annotation",
+        dest="output",
+        help="path to the output coco annotation file",
+        required=True,
+    )
+
+    args = parser.parse_args()
+    transform_sterblue_to_coco(args.input_sterblue, args.input_categories, args.output)
+
+
 if __name__ == "__main__":
-    input_sterblue = sys.argv[1]
-    input_categories = sys.argv[2]
-    output = sys.argv[3]
-    print("Transform status: Starting")
-    transform_sterblue_to_coco(input_sterblue, input_categories, output)
+    main()
