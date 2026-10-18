@@ -1,179 +1,223 @@
+"""Convert a Sterblue organisation export to one COCO annotation file per mission, plus a merged one.
+
+Usage: transform_sterblue_to_coco.py <export_root>
+  writes <mission dir>/<mission>.coco.json and <export_root>/merged.coco.json
+
+Fixes over the previous single-mission version of this script:
+* categories = anomalyLevelMappings + every detection type actually used in the export,
+  with ids shared across missions (old script emitted category_id -1 for unmapped types)
+* all polygon rings are kept as separate COCO polygons (old script kept only ring 0)
+* y is negated (Sterblue y points up) and coordinates are clipped to the image
+  (old script used abs(), which mirrors the few points above the top edge)
+* area is the polygon area, not the bbox area
+* degenerate polygons (< 3 points or zero area after clipping) are dropped and counted
+* Sterblue provenance (detection id, author, level) is kept on each annotation
+"""
+
 import argparse
 import json
-import logging
+import re
 import sys
-from itertools import chain
+from functools import reduce
+from itertools import accumulate, chain
+from pathlib import Path
 
-logger = logging.getLogger(__name__)
-
-
-def bounding_box(points):
-    """Compute the bounding box of a polygon
-    * Sterblue image axis: (0,0): top left corner, x positive to the right, y positive upward
-    * COCO image axis: (0,0): top left corner, x positive to the right, y positive downward
-
-    Args:
-        points: List of points [ [x0, y0], [x1, y1], etc.]
-    Return:
-        Bounding box output format: [xmin, ymin, width, height]
-    """
-    x_coordinates, y_coordinates = zip(*points)
-    xmin = min(x_coordinates)
-    ymin = -max(y_coordinates)
-    width = max(x_coordinates) - min(x_coordinates)
-    height = max(y_coordinates) - min(y_coordinates)
-    area = width * height
-    return {"geometry": [xmin, ymin, width, height], "area": area}
+STRUCTURE_TYPE_BY_MISSION_TYPE = {
+    "InspectWindTurbine": "WindTurbine",
+    "InspectPowerLineHighVoltagePylon": "HighVoltagePowerLine",
+    "InspectPowerLineMediumVoltagePylon": "MediumVoltagePowerLine",
+    "InspectCoolingTower": "CoolingTower",
+    "InspectSolarFarm": "SolarFarm",
+}
 
 
-def transform_sterblue_to_coco(
-    input_sterblue: str, input_anomalyLevelMappings: str, output_file: str
-) -> str:
-    """Transform STERBLUE annotation file to COCO annotation file format.
+def load_json(path: Path) -> dict:
+    return json.loads(path.read_text())
 
-    Args:
-        input_sterblue: Path to sterblue input file.
-        output_file : Path to COCO format output file.
-    """
-    indent = 4
-    with open(input_sterblue, "r") as f:
-        data_sterblue = json.load(f)
-    with open(input_anomalyLevelMappings, "r") as f:
-        data_anomalyLevelMappings = json.load(f)
 
-    mapping_missionType_structureType = {
-        "InspectWindTurbine": "WindTurbine",
-        "InspectPowerLineHighVoltagePylon": "HighVoltagePowerLine",
-        "InspectPowerLineMediumVoltagePylon": "MediumVoltagePowerLine",
-        "InspectCoolingTower": "CoolingTower",
-        "InspectSolarFarm": "SolarFarm",
+def mission_files(root: Path) -> list[Path]:
+    return sorted(
+        p
+        for p in root.glob("*/*.json")
+        if not p.name.startswith("._") and not p.name.endswith(".coco.json")
+    )
+
+
+def coco_output_name(source_name: str) -> str:
+    """'<mission>.json' -> '<mission>.coco.json', with characters Windows rejects in file names replaced by '_'."""
+    return re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", Path(source_name).stem) + ".coco.json"
+
+
+def detection_types(mission: dict) -> list[str]:
+    return [
+        det["type"]["name"]
+        for image in mission["execution"]["images"]
+        for det in image["detections"]
+    ]
+
+
+def build_categories(metadata: dict, structure_type: str, used_types: list[str]) -> list[dict]:
+    mapped = [
+        a["name"]
+        for m in metadata["anomalyLevelMappings"]
+        if m["structureType"] == structure_type
+        for a in m["anomalyTypes"]
+    ]
+    mapped_unique = list(dict.fromkeys(mapped))
+    extras = sorted(set(used_types) - set(mapped_unique))
+    return [
+        {"id": i, "name": name, "supercategory": "", "in_anomaly_mapping": name in set(mapped_unique)}
+        for i, name in enumerate(mapped_unique + extras, start=1)
+    ]
+
+
+def clip(value: float, low: float, high: float) -> float:
+    return max(low, min(high, value))
+
+
+def to_image_coords(ring: list[list[float]], width: int, height: int) -> list[tuple[float, float]]:
+    return [(clip(x, 0, width), clip(-y, 0, height)) for x, y in ring]
+
+
+def ring_area(ring: list[tuple[float, float]]) -> float:
+    pairs = zip(ring, ring[1:] + ring[:1])
+    return abs(sum(x1 * y2 - x2 * y1 for (x1, y1), (x2, y2) in pairs)) / 2
+
+
+def valid_ring(ring: list[tuple[float, float]]) -> bool:
+    return len(set(ring)) >= 3 and ring_area(ring) > 0
+
+
+def to_annotation(det: dict, image_id: int, width: int, height: int, category_ids: dict) -> dict | None:
+    rings = [to_image_coords(r, width, height) for r in det["geometry"]["geojson"]["coordinates"]]
+    rings = [r for r in rings if valid_ring(r)]
+    if not rings:
+        return None
+    xs, ys = zip(*chain.from_iterable(rings))
+    xmin, ymin = min(xs), min(ys)
+    return {
+        "image_id": image_id,
+        "category_id": category_ids[det["type"]["name"]],
+        "segmentation": [list(chain.from_iterable(r)) for r in rings],
+        "area": sum(ring_area(r) for r in rings),
+        "bbox": [xmin, ymin, max(xs) - xmin, max(ys) - ymin],
+        "iscrowd": 0,
+        "sterblue_detection_id": det["id"],
+        "sterblue_author": (det.get("author") or {}).get("name"),
+        "sterblue_level": det.get("level"),
     }
 
-    output: Dict[str, Any] = {
+
+def to_image(image: dict, image_id: int) -> dict:
+    return {
+        "id": image_id,
+        "file_name": f'{image["file"]["name"]}-{image["id"]}.jpeg',
+        "coco_url": "",
+        "date_captured": image["capturedAt"],
+        "height": image["height"],
+        "width": image["width"],
+        "license": 0,
+        "sterblue_image_id": image["id"],
+    }
+
+
+def convert_mission(mission: dict, categories: list[dict]) -> tuple[dict, int]:
+    category_ids = {c["name"]: c["id"] for c in categories}
+    images = list(enumerate(mission["execution"]["images"], start=1))
+    candidates = [
+        to_annotation(det, image_id, image["width"], image["height"], category_ids)
+        for image_id, image in images
+        for det in image["detections"]
+        if not det.get("deletedAt")
+    ]
+    kept = [a for a in candidates if a is not None]
+    coco = {
         "info": {
-            "contributor": "",
-            "date_created": "",
-            "description": "",
+            "contributor": "Sterblue export",
+            "date_created": mission["createdAt"],
+            "description": f'{mission["name"]} ({mission["id"]})',
             "url": "",
             "version": "",
-            "year": "",
+            "year": mission["createdAt"][:4],
         },
         "licenses": [{"name": "", "id": 0, "url": ""}],
+        "categories": categories,
+        "images": [to_image(image, image_id) for image_id, image in images],
+        "annotations": [{"id": i, **a} for i, a in enumerate(kept, start=1)],
+    }
+    return coco, len(candidates) - len(kept)
+
+
+def merge_missions(cocos: list[tuple[str, dict]]) -> dict:
+    """Merge per-mission COCO files that share categories into one.
+
+    Image and annotation ids are renumbered globally, and each file_name is prefixed with its
+    mission directory so the merged file resolves images from the export root.
+    """
+    offsets = list(
+        accumulate(
+            ((len(c["images"]), len(c["annotations"])) for _, c in cocos[:-1]),
+            lambda acc, n: (acc[0] + n[0], acc[1] + n[1]),
+            initial=(0, 0),
+        )
+    )
+    images = [
+        {
+            **image,
+            "id": image["id"] + img_offset,
+            "file_name": f'{mission_dir}/{image["file_name"]}',
+            "sterblue_mission": coco["info"]["description"],
+        }
+        for (mission_dir, coco), (img_offset, _) in zip(cocos, offsets)
+        for image in coco["images"]
+    ]
+    annotations = [
+        {**ann, "id": ann["id"] + ann_offset, "image_id": ann["image_id"] + img_offset}
+        for (_, coco), (img_offset, ann_offset) in zip(cocos, offsets)
+        for ann in coco["annotations"]
+    ]
+    first = cocos[0][1]
+    return {
+        "info": {**first["info"], "description": f"{len(cocos)} merged Sterblue missions"},
+        "licenses": first["licenses"],
+        "categories": first["categories"],
+        "images": images,
+        "annotations": annotations,
     }
 
-    output["categories"], output["images"], output["annotations"] = [], [], []
 
-    # Build the list of categories
-    anomalyLevelMappings = data_anomalyLevelMappings["anomalyLevelMappings"]
-    index_category = 1
-    unique_categories = set()
-    mapping_category_name_index = {}
-    valid_anomalyLevelMapping_found = 0
-    for anomalyLevelMapping in anomalyLevelMappings:
-        # Only consider the anomaly level mappings compatible with the sterblue mission type being converted to COCO
-        if (data_sterblue["type"] in mapping_missionType_structureType) and (
-            anomalyLevelMapping["structureType"]
-            == mapping_missionType_structureType[data_sterblue["type"]]
-        ):
-            valid_anomalyLevelMapping_found = 1
-            for anomalyType in anomalyLevelMapping["anomalyTypes"]:
-                # Add only unique categories
-                if anomalyType["name"] not in unique_categories:
-                    unique_categories.add(anomalyType["name"])
-                    mapping_category_name_index[anomalyType["name"]] = index_category
-                    output["categories"].append(
-                        {
-                            "id": index_category,
-                            "name": anomalyType["name"],
-                            "supercategory": "",
-                        }
-                    )
-                    index_category += 1
-
-    # No compatible mappings have been found
-    if valid_anomalyLevelMapping_found == 0:
-        print(
-            f'Error. No mapping found for mission "{data_sterblue["id"]+"-"+data_sterblue["name"]}" with mission type "{data_sterblue["type"]}"'
-        )
-        exit()
-
-    # Build the list of images
-    index_annotation = 1
-    images = data_sterblue["execution"]["images"]
-    for index_image, image in enumerate(images, start=1):
-        output["images"].append(
-            {
-                "id": index_image,
-                "file_name": image["file"]["name"] + "-" + image["id"] + ".jpeg",
-                "coco_url": "",
-                "date_captured": image["capturedAt"],
-                "height": image["height"],
-                "width": image["width"],
-                "license": 0,
-            }
-        )
-
-        # Build the list of annotations
-        for detection in image["detections"]:
-            polygon_geometry = detection["geometry"]["geojson"]["coordinates"][0]
-            bbox = bounding_box(polygon_geometry)
-            output["annotations"].append(
-                {
-                    "id": index_annotation,
-                    "image_id": index_image,
-                    "category_id": mapping_category_name_index.get(
-                        detection["type"]["name"], -1
-                    ),
-                    "segmentation": [
-                        [
-                            abs(coordinate)
-                            for coordinate in list(chain(*polygon_geometry))
-                        ]
-                    ],
-                    "area": bbox["area"],
-                    "bbox": bbox["geometry"],
-                    "iscrowd": 0,
-                }
-            )
-            index_annotation += 1
-
-    print(json.dumps(mapping_category_name_index, indent=4))
-
-    with open(output_file, "w") as f:
-        json.dump(output, f, indent=indent)
-
-    print("Conversion status: Finished")
-
-    return output_file
-
-
-def main():
-    parser = argparse.ArgumentParser(
-        description="Convert a Sterblue annotation file to the COCO annotation format."
-    )
-    parser.add_argument(
-        "--sterblue-annotation",
-        dest="input_sterblue",
-        help="path to your sterblue annotation file",
-        required=True,
-    )
-
-    parser.add_argument(
-        "--category-file",
-        dest="input_categories",
-        help="path to the mapping file",
-        required=True,
-    )
-
-    parser.add_argument(
-        "--coco-annotation",
-        dest="output",
-        help="path to the output coco annotation file",
-        required=True,
-    )
-
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("export_root", type=Path, help="directory holding metadata.json and one sub-directory per mission")
+    parser.add_argument("--merged-name", default="merged.coco.json", help="merged COCO file written to export_root")
+    parser.add_argument("--dry-run", action="store_true", help="convert and report, write nothing")
     args = parser.parse_args()
-    transform_sterblue_to_coco(args.input_sterblue, args.input_categories, args.output)
+
+    metadata = load_json(args.export_root / "metadata.json")
+    paths = mission_files(args.export_root)
+    missions = [(p, load_json(p)) for p in paths]
+
+    mission_types = {m["type"] for _, m in missions}
+    unknown = mission_types - STRUCTURE_TYPE_BY_MISSION_TYPE.keys()
+    if len(mission_types) != 1 or unknown:
+        sys.exit(f"expected a single known mission type, got {sorted(mission_types)}")
+    structure_type = STRUCTURE_TYPE_BY_MISSION_TYPE[mission_types.pop()]
+
+    used = reduce(lambda acc, m: acc + detection_types(m[1]), missions, [])
+    categories = build_categories(metadata, structure_type, used)
+
+    converted = [(path, *convert_mission(mission, categories)) for path, mission in missions]
+    for path, coco, dropped in converted:
+        out = path.with_name(coco_output_name(path.name))
+        if not args.dry_run:
+            out.write_text(json.dumps(coco, ensure_ascii=False, indent=2))
+        print(f'{len(coco["images"]):5d} img {len(coco["annotations"]):6d} ann {dropped:3d} dropped  {out.relative_to(args.export_root)}')
+
+    merged = merge_missions([(path.parent.name, coco) for path, coco, _ in converted])
+    merged_out = args.export_root / args.merged_name
+    if not args.dry_run:
+        merged_out.write_text(json.dumps(merged, ensure_ascii=False, indent=2))
+    print(f'{len(merged["images"]):5d} img {len(merged["annotations"]):6d} ann merged   {merged_out.name}')
 
 
 if __name__ == "__main__":
