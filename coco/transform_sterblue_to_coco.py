@@ -16,6 +16,7 @@ Fixes over the previous single-mission version of this script:
 
 import argparse
 import json
+import re
 import sys
 from functools import reduce
 from itertools import accumulate, chain
@@ -40,6 +41,11 @@ def mission_files(root: Path) -> list[Path]:
         for p in root.glob("*/*.json")
         if not p.name.startswith("._") and not p.name.endswith(".coco.json")
     )
+
+
+def coco_output_name(source_name: str) -> str:
+    """'<mission>.json' -> '<mission>.coco.json', with characters Windows rejects in file names replaced by '_'."""
+    return re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", Path(source_name).stem) + ".coco.json"
 
 
 def detection_types(mission: dict) -> list[str]:
@@ -202,7 +208,7 @@ def main() -> None:
 
     converted = [(path, *convert_mission(mission, categories)) for path, mission in missions]
     for path, coco, dropped in converted:
-        out = path.with_name(path.stem + ".coco.json")
+        out = path.with_name(coco_output_name(path.name))
         if not args.dry_run:
             out.write_text(json.dumps(coco, ensure_ascii=False, indent=2))
         print(f'{len(coco["images"]):5d} img {len(coco["annotations"]):6d} ann {dropped:3d} dropped  {out.relative_to(args.export_root)}')

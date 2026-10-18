@@ -4,7 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "coco"))
 
-from transform_sterblue_to_coco import build_categories, convert_mission, merge_missions
+from transform_sterblue_to_coco import build_categories, convert_mission, coco_output_name, merge_missions
 
 
 def detection(name, rings, det_id="d1"):
@@ -95,6 +95,14 @@ class TestConvertMission(unittest.TestCase):
     def test_image_file_name_matches_export_jpeg(self):
         coco, _ = self.convert([])
         self.assertEqual(coco["images"][0]["file_name"], "DJI_0001.JPG-img1.jpeg")
+
+
+class TestCocoOutputName(unittest.TestCase):
+    def test_appends_coco_suffix(self):
+        self.assertEqual(coco_output_name("2020-11-19-Mission-abc.json"), "2020-11-19-Mission-abc.coco.json")
+
+    def test_replaces_characters_windows_rejects(self):
+        self.assertEqual(coco_output_name('Zone Janne?e <a>:b"c|d*.json'), "Zone Janne_e _a__b_c_d_.coco.json")
 
 
 class TestMergeMissions(unittest.TestCase):
