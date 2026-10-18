@@ -87,6 +87,7 @@ def build_data(coco: dict, missions: list[dict], ai_authors: set[str]) -> tuple[
             "name": Path(image["file_name"]).name.split(".")[0],
             "file": Path(image["file_name"]).name,
             "sid": image.get("sterblue_image_id"),
+            "gid": image["id"],
             "date": image.get("date_captured", ""),
             "a": [
                 [a["category_id"], author_index[a.get("sterblue_author") or ""], [rounded(p) for p in a["segmentation"]]]

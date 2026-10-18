@@ -64,7 +64,7 @@ class TestBuildData(unittest.TestCase):
         coco = coco_fixture()
         _, per_mission = build_data(coco, plan(coco), {"Sterblue"})
         record = per_mission["m02"]["images"][0]
-        self.assertEqual((record["file"], record["sid"], record["w"], record["h"]), ("b1.jpeg", "sb1", 100, 50))
+        self.assertEqual((record["file"], record["sid"], record["gid"], record["w"], record["h"]), ("b1.jpeg", "sb1", 1, 100, 50))
         self.assertEqual(record["a"][0][2], [[1, 3, 3, 4, 5, 6]])
 
 

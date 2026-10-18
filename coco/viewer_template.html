@@ -74,6 +74,11 @@
   .vbar .btn.on { background: #1c7ed6; border-color: #1c7ed6; }
   .vbar .title { margin: 0 8px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
   .vbar .title small { color: #9aa3ae; margin-left: 8px; }
+  .mission-link { background: none; border: 0; padding: 2px 4px; margin-left: -4px; border-radius: 4px; color: inherit;
+    font: inherit; cursor: pointer; }
+  .mission-link:hover { background: #232830; }
+  .mission-link:hover span:last-child { text-decoration: underline; }
+  .mission-link .folder { margin-right: 6px; }
   .vbar .sep { width: 1px; height: 22px; background: #353c46; margin: 0 4px; }
   #stage { position: relative; overflow: hidden; cursor: grab; touch-action: none; }
   #stage.dragging { cursor: grabbing; }
@@ -105,7 +110,7 @@
   details.orig summary h3 { margin: 4px 0; }
   .orig-row { padding: 6px 4px; border-radius: 5px; }
   .orig-row .what { display: block; font-size: 12px; color: #9aa3ae; }
-  .orig-row .file { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 1px 0 4px; }
+  .orig-row .file { display: block; font-size: 12px; word-break: break-all; margin: 2px 0 4px; user-select: all; }
   .orig-row .actions { display: flex; gap: 6px; }
   .mini { font-size: 12px; padding: 2px 8px; border-radius: 5px; border: 1px solid #353c46; background: #232830;
     color: #e6e9ee; cursor: pointer; text-decoration: none; }
@@ -520,7 +525,7 @@
     const p = decodeURIComponent(url.pathname);
     return /^\/[A-Za-z]:/.test(p) ? p.slice(1).replace(/\//g, "\\") : p; // file:///E:/x -> E:\x on Windows
   };
-  const copyText = async (text, button) => {
+  const copyText = async (text) => {
     try {
       await navigator.clipboard.writeText(text);
     } catch {
@@ -530,37 +535,47 @@
       document.execCommand("copy");
       area.remove();
     }
-    button.textContent = "Copié ✓";
-    setTimeout(() => { button.textContent = "Copier le chemin"; }, 1500);
   };
-  const originalRow = (what, url, label) => {
-    const copy = el("button", { className: "mini", textContent: "Copier le chemin",
-      title: "Copie le chemin : collez-le dans la barre d'adresse de l'Explorateur Windows" });
-    copy.addEventListener("click", () => copyText(nativePath(url), copy));
+  const flash = (node, text) => {
+    const before = node.textContent;
+    node.textContent = text;
+    setTimeout(() => { node.textContent = before; }, 1500);
+  };
+  const COPY_HINT = "Copie le chemin : collez-le (Ctrl+V) dans la barre d'adresse de l'Explorateur Windows";
+  const originalRow = (what, url, { canOpen, detail }) => {
+    const path = nativePath(url);
+    const copy = el("button", { className: "mini", textContent: "Copier le chemin", title: COPY_HINT });
+    copy.addEventListener("click", () => copyText(path).then(() => flash(copy, "Copié ✓")));
     return el("div", { className: "orig-row" },
       el("span", { className: "what", textContent: what }),
-      el("span", { className: "file", textContent: label, title: nativePath(url) }),
+      el("span", { className: "file", textContent: path }),
+      detail ? el("span", { className: "what", textContent: detail }) : "",
       el("div", { className: "actions" },
-        el("a", { className: "mini", textContent: "Ouvrir", href: url.href, target: "_blank", rel: "noopener" }), copy));
+        canOpen ? el("a", { className: "mini", textContent: "Ouvrir", href: url.href, target: "_blank", rel: "noopener" }) : "",
+        copy));
+  };
+  const missionFolderPath = (m) => nativePath(originalUrl(m.dir, "")).replace(/[\\/]$/, "");
+  const missionTitleNode = (m) => {
+    if (!ORIG) return document.createTextNode(missionTitle(m));
+    const label = el("span", { textContent: missionTitle(m) });
+    const button = el("button", { className: "mission-link",
+      title: "Cliquer pour copier le chemin du dossier de la mission (à coller dans l'Explorateur Windows)" },
+      el("span", { className: "folder", textContent: "📁" }), label);
+    button.addEventListener("click", () => copyText(missionFolderPath(m)).then(() => flash(label, "Chemin du dossier copié ✓")));
+    return button;
   };
   let originalsReachable = null; // checked once, by loading the first original photo shown
   const renderOriginals = (item, rec) => {
     if (!ORIG) { $("origBox").hidden = true; return; }
-    const m = item.m;
-    const photoUrl = originalUrl(m.dir, rec.file);
+    const photoUrl = originalUrl(item.m.dir, rec.file);
     const rows = [
-      originalRow("Photo originale (pleine résolution)", photoUrl, rec.file),
-      originalRow("Dossier de la mission", originalUrl(m.dir, ""), m.dir),
-      m.files.source && originalRow("Annotations Sterblue de la mission", originalUrl(m.dir, m.files.source), m.files.source),
-      m.files.coco && originalRow("Annotations COCO de la mission", originalUrl(m.dir, m.files.coco), m.files.coco),
-      originalRow("Annotations COCO de toutes les missions", new URL(encodePath(ORIG.merged), location.href), ORIG.merged.split("/").pop()),
-    ].filter(Boolean);
-    const note = el("div", { className: "orig-note" }, "Pour retrouver cette photo dans les fichiers d'annotations : identifiant Sterblue ",
-      el("code", { textContent: rec.sid || "?" }), ", numéro COCO ", el("code", { textContent: String(item.i + 1) }),
-      " dans le fichier de la mission.");
+      originalRow("Photo en pleine résolution", photoUrl, { canOpen: true }),
+      originalRow("Fichier d'annotations utilisé pour les contours", new URL(encodePath(ORIG.merged), location.href),
+        { canOpen: false, detail: `Cette photo y porte le numéro ${rec.gid} (champ « id » des images).` }),
+    ];
     const warn = el("div", { className: "orig-warn", hidden: originalsReachable !== false,
       textContent: `Fichiers originaux introuvables. Ils sont dans le dossier « ${ORIG.rootName} », qui doit rester à côté du dossier de la visionneuse, comme sur la clé USB.` });
-    $("origList").replaceChildren(warn, ...rows, note);
+    $("origList").replaceChildren(warn, ...rows);
     if (originalsReachable === null) {
       originalsReachable = "pending";
       const probe = new Image();
@@ -578,7 +593,7 @@
     const item = state.list[pos];
     $("prev").disabled = pos === 0;
     $("next").disabled = pos === state.list.length - 1;
-    $("vtitle").replaceChildren(missionTitle(item.m),
+    $("vtitle").replaceChildren(missionTitleNode(item.m),
       el("small", { textContent: `photo ${item.i + 1} sur ${item.m.images.length}`
         + (state.list.length !== item.m.images.length ? ` · ${pos + 1} / ${state.list.length} dans votre sélection` : "") }));
     $("loading").style.display = "block";

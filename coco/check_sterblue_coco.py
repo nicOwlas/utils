@@ -96,7 +96,8 @@ def check_export(root: Path, viewer: Path | None = None) -> tuple[dict, list[str
                   f"{jpeg}: merged COCO does not match")
             if viewer_data:
                 record = viewer_data["images"][number - 1]
-                check(record["file"] == jpeg and record["sid"] == source_image["id"] and len(record["a"]) == len(anns),
+                check(record["file"] == jpeg and record["sid"] == source_image["id"] and len(record["a"]) == len(anns)
+                      and merged_image is not None and record.get("gid") == merged_image["id"],
                       f"{jpeg}: viewer record does not match")
                 check((viewer / f"assets/img/{viewer_mission['key']}/{number:04d}.jpg").is_file(),
                       f"{jpeg}: viewer image missing")
